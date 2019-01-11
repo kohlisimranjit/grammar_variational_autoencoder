@@ -2,6 +2,9 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
+import pdb
+
+VISUALIZE_DASHBOARD = False
 
 
 class Decoder(nn.Module):
@@ -34,7 +37,7 @@ class Decoder(nn.Module):
         out_3, hidden_3 = self.gru_3(out_2, hidden_3)
         out = self.fc_out(out_3.contiguous().view(-1, self.hidden_n)).view(_batch_size, self.max_seq_length,
                                                                            self.output_feature_size)
-        return F.relu(F.sigmoid(out)), hidden_1, hidden_2, hidden_3
+        return F.relu(torch.sigmoid(out)), hidden_1, hidden_2, hidden_3
 
     def init_hidden(self, batch_size):
         # NOTE: assume only 1 layer no bi-direction
@@ -58,7 +61,8 @@ class Encoder(nn.Module):
         # todo: harded coded because I can LOL
         self.fc_0 = nn.Linear(12 * 9, hidden_n)
         self.fc_mu = nn.Linear(hidden_n, hidden_n)
-        self.fc_var = nn.Linear(hidden_n, hidden_n)
+        if GrammarVariationalAutoEncoder.VAE_MODE:
+            self.fc_var = nn.Linear(hidden_n, hidden_n)
 
     def forward(self, x):
         batch_size = x.size()[0]
@@ -68,8 +72,10 @@ class Encoder(nn.Module):
         x = F.relu(self.bn_3(self.conv_3(x)))
         x_ = x.view(batch_size, -1)
         h = self.fc_0(x_)
-        return self.fc_mu(h), self.fc_var(h)
-
+        if GrammarVariationalAutoEncoder.VAE_MODE:
+            return self.fc_mu(h), self.fc_var(h)
+        else:
+            return self.fc_mu(h), None
 
 from visdom_helper.visdom_helper import Dashboard
 
@@ -79,26 +85,29 @@ class VAELoss(nn.Module):
         super(VAELoss, self).__init__()
         self.bce_loss = nn.BCELoss()
         self.bce_loss.size_average = False
-        self.dashboard = Dashboard('Variational-Autoencoder-experiment')
+        if VISUALIZE_DASHBOARD:
+            self.dashboard = Dashboard('Variational-Autoencoder-experiment')
 
     # question: how is the loss function using the mu and variance?
-    def forward(self, x, mu, log_var, recon_x):
+    def forward(self, x, recon_x, mu=None, log_var=None):
         """gives the batch normalized Variational Error."""
 
         batch_size = x.size()[0]
         BCE = self.bce_loss(recon_x, x)
-
+        KLD = 0
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var)
-        KLD = torch.sum(KLD_element).mul_(-0.5)
+        if GrammarVariationalAutoEncoder.VAE_MODE:
+            KLD_element = mu.pow(2).add_(log_var.exp()).mul_(-1).add_(1).add_(log_var)
+            KLD = torch.sum(KLD_element).mul_(-0.5)
 
         return (BCE + KLD) / batch_size
 
 
 class GrammarVariationalAutoEncoder(nn.Module):
+    VAE_MODE = True
     def __init__(self):
         super(GrammarVariationalAutoEncoder, self).__init__()
         self.encoder = Encoder(15)
@@ -106,11 +115,24 @@ class GrammarVariationalAutoEncoder(nn.Module):
 
     def forward(self, x):
         batch_size = x.size()[0]
-        mu, log_var = self.encoder(x)
-        z = self.reparameterize(mu, log_var)
+        mu = None
+        log_var = None
+        if GrammarVariationalAutoEncoder.VAE_MODE:
+            mu, log_var = self.encoder(x)
+            z = self.reparameterize(mu, log_var)
+        else:
+            z, _none = self.encoder(x)
         h1, h2, h3 = self.decoder.init_hidden(batch_size)
         output, h1, h2, h3 = self.decoder(z, h1, h2, h3)
-        return output, mu, log_var
+        if GrammarVariationalAutoEncoder.VAE_MODE:
+            return output, mu, log_var
+        else: 
+            return output
+
+    def save_model(self, root_path):
+        torch.save(self.state_dict(), root_path+'grammar_ae_model.pt')
+        torch.save(self.decoder.state_dict(), root_path+'grammar_decoder.pt')
+        torch.save(self.encoder.state_dict(), root_path+'grammar_autoencoder.pt')
 
     def reparameterize(self, mu, log_var):
         """you generate a random distribution w.r.t. the mu and log_var from the embedding space."""

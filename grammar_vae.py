@@ -2,9 +2,10 @@ import numpy as np
 import torch.utils.data
 import torch.optim as optim
 from torch.autograd import Variable
-
-from model import GrammarVariationalAutoEncoder, VAELoss
-
+import pdb
+from model import GrammarVariationalAutoEncoder, VAELoss, VISUALIZE_DASHBOARD
+import os
+from visdom_helper.visdom_helper import Dashboard
 from visdom_helper.visdom_helper import Dashboard
 
 
@@ -14,7 +15,9 @@ class Session():
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
         self.loss_fn = VAELoss()
-        self.dashboard = Dashboard('Grammar-Variational-Autoencoder-experiment')
+        self.dashboard = None
+        if VISUALIZE_DASHBOARD:
+            self.dashboard = Dashboard('Grammar-Variational-Autoencoder-experiment')
 
     def train(self, loader, epoch_number):
         # built-in method for the nn.module, sets a training flag.
@@ -26,8 +29,8 @@ class Session():
             # do not use CUDA atm
             self.optimizer.zero_grad()
             recon_batch, mu, log_var = self.model(data)
-            loss = self.loss_fn(data, mu, log_var, recon_batch)
-            _losses.append(loss.numpy())
+            loss = self.loss_fn(data, recon_batch, mu, log_var)
+            _losses.append(loss.cpu().detach().numpy())
             loss.backward()
             self.optimizer.step()
             self.train_step += 1
@@ -35,14 +38,18 @@ class Session():
             loss_value = loss.data.numpy()
             batch_size = len(data)
 
-            self.dashboard.append('training_loss', 'line',
+            if VISUALIZE_DASHBOARD:
+                self.dashboard.append('training_loss', 'line',
                                   X=np.array([self.train_step]),
                                   Y=loss_value / batch_size)
 
             if batch_idx == 0:
                 print('batch size', batch_size)
             if batch_idx % 40 == 0:
-                print('training loss: {:.4f}'.format(loss_value[0] / batch_size))
+                # print('training loss: {:.4f}'.format(loss_value[0] / batch_size))
+                print('training loss: {:.20f}'.format(loss_value / batch_size))
+
+        self.model.save_model('../save_model/')
         return _losses
 
     def test(self, loader):
@@ -53,11 +60,11 @@ class Session():
             data = Variable(data, volatile=True)
             # do not use CUDA atm
             recon_batch, mu, log_var = self.model(data)
-            test_loss += self.loss_fn(data, mu, log_var, recon_batch).data[0]
-
+            # test_loss += self.loss_fn(data, recon_batch, mu, log_var).data[0]
+            test_loss += self.loss_fn(data, recon_batch, mu, log_var).data.detach().cpu().numpy()
         test_loss /= len(test_loader.dataset)
         print('testset length', len(test_loader.dataset))
-        print('====> Test set loss: {:.4f}'.format(test_loss))
+        print('====> Test set loss: {:.20f}'.format(test_loss))
 
 
 EPOCHS = 20
