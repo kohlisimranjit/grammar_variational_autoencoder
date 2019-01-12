@@ -146,3 +146,12 @@ class GrammarVariationalAutoEncoder(nn.Module):
         eps = Variable(torch.FloatTensor(vector_size).normal_())
         std = log_var.mul(0.5).exp_()
         return eps.mul(std).add_(mu)
+
+    def decode(self, z):
+        batch_size = z.size()[0]
+        h1, h2, h3 = self.decoder.init_hidden(batch_size)
+        h1 = h1.to(device)
+        h2 = h2.to(device)
+        h3 = h3.to(device)
+        output, h1, h2, h3 = self.decoder(z, h1, h2, h3)
+        return output
