@@ -8,11 +8,14 @@ import os
 from visdom_helper.visdom_helper import Dashboard
 from visdom_helper.visdom_helper import Dashboard
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 class Session():
     def __init__(self, model, train_step_init=0, lr=1e-3, is_cuda=False):
         self.train_step = train_step_init
         self.model = model
+        model.to(device)
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
         self.loss_fn = VAELoss()
         self.dashboard = None
@@ -25,7 +28,7 @@ class Session():
         _losses = []
         for batch_idx, data in enumerate(loader):
             # have to cast data to FloatTensor. DoubleTensor errors with Conv1D
-            data = Variable(data)
+            data = Variable(data).to(device)
             # do not use CUDA atm
             self.optimizer.zero_grad()
             mu = None

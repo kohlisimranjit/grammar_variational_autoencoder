@@ -5,6 +5,8 @@ import torch.nn.functional as F
 import pdb
 
 VISUALIZE_DASHBOARD = False
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 
 class Decoder(nn.Module):
@@ -110,8 +112,8 @@ class GrammarVariationalAutoEncoder(nn.Module):
     VAE_MODE = False
     def __init__(self):
         super(GrammarVariationalAutoEncoder, self).__init__()
-        self.encoder = Encoder(15)
-        self.decoder = Decoder()
+        self.encoder = Encoder(15).to(device)
+        self.decoder = Decoder().to(device)
 
     def forward(self, x):
         batch_size = x.size()[0]
