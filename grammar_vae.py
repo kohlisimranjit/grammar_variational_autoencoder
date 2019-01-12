@@ -28,7 +28,14 @@ class Session():
             data = Variable(data)
             # do not use CUDA atm
             self.optimizer.zero_grad()
-            recon_batch, mu, log_var = self.model(data)
+            mu = None
+            log_var = None
+            recon_batch = None
+            if GrammarVariationalAutoEncoder.VAE_MODE:
+                recon_batch, mu, log_var = self.model(data)
+            else:
+                recon_batch = self.model(data)
+
             loss = self.loss_fn(data, recon_batch, mu, log_var)
             _losses.append(loss.cpu().detach().numpy())
             loss.backward()
@@ -59,7 +66,14 @@ class Session():
         for batch_idx, data in enumerate(loader):
             data = Variable(data, volatile=True)
             # do not use CUDA atm
-            recon_batch, mu, log_var = self.model(data)
+            mu = None
+            log_var = None
+            recon_batch = None
+            if GrammarVariationalAutoEncoder.VAE_MODE:
+                recon_batch, mu, log_var = self.model(data)
+            else:
+                recon_batch = self.model(data)
+
             # test_loss += self.loss_fn(data, recon_batch, mu, log_var).data[0]
             test_loss += self.loss_fn(data, recon_batch, mu, log_var).data.detach().cpu().numpy()
         test_loss /= len(test_loader.dataset)
