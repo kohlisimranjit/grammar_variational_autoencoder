@@ -6,7 +6,7 @@ import pdb
 
 VISUALIZE_DASHBOARD = False
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+# device = torch.device("cpu")
 
 
 class Decoder(nn.Module):
@@ -19,9 +19,9 @@ class Decoder(nn.Module):
         self.fc_input = nn.Linear(input_size, hidden_n)
         # we specify each layer manually, so that we can do teacher forcing on the last layer.
         # we also use no drop-out in this version.
-        self.gru_1 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True)
-        self.gru_2 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True)
-        self.gru_3 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True)
+        self.gru_1 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True).to(device)
+        self.gru_2 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True).to(device)
+        self.gru_3 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True).to(device)
         self.fc_out = nn.Linear(hidden_n, output_feature_size)
 
     def forward(self, encoded, hidden_1, hidden_2, hidden_3, beta=0.3, target_seq=None):
@@ -29,8 +29,9 @@ class Decoder(nn.Module):
 
         embedded = F.relu(self.fc_input(self.batch_norm(encoded))) \
             .view(_batch_size, 1, -1) \
-            .repeat(1, self.max_seq_length, 1)
+            .repeat(1, self.max_seq_length, 1).to(device)
         # batch_size, seq_length, hidden_size; batch_size, hidden_size
+        # pdb.set_trace()
         out_1, hidden_1 = self.gru_1(embedded, hidden_1)
         out_2, hidden_2 = self.gru_2(out_1, hidden_2)
         # NOTE: need to combine the input from previous layer with the expected output during training.
@@ -125,6 +126,9 @@ class GrammarVariationalAutoEncoder(nn.Module):
         else:
             z, _none = self.encoder(x)
         h1, h2, h3 = self.decoder.init_hidden(batch_size)
+        h1 = h1.to(device)
+        h2 = h2.to(device)
+        h3 = h3.to(device)
         output, h1, h2, h3 = self.decoder(z, h1, h2, h3)
         if GrammarVariationalAutoEncoder.VAE_MODE:
             return output, mu, log_var

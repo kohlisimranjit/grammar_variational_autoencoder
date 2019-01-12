@@ -9,13 +9,13 @@ from visdom_helper.visdom_helper import Dashboard
 from visdom_helper.visdom_helper import Dashboard
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+# device = torch.device("cpu")
 
 class Session():
     def __init__(self, model, train_step_init=0, lr=1e-3, is_cuda=False):
         self.train_step = train_step_init
-        self.model = model
-        model.to(device)
+        self.model = model.to(device)
+        # model.to(device)
         self.optimizer = optim.Adam(model.parameters(), lr=lr)
         self.loss_fn = VAELoss()
         self.dashboard = None
@@ -45,7 +45,7 @@ class Session():
             self.optimizer.step()
             self.train_step += 1
 
-            loss_value = loss.data.numpy()
+            loss_value = loss.cpu().detach().numpy()
             batch_size = len(data)
 
             if VISUALIZE_DASHBOARD:
