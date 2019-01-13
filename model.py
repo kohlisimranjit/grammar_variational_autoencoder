@@ -7,16 +7,25 @@ import pdb
 VISUALIZE_DASHBOARD = False
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
-
+# {'hidden': 100, 'dense': 100, 'conv1': 2, 'conv2': 3, 'conv3': 4}
+USE_MOLECULE_VAE_PARAMS = True
+LATENT_REP_SIZE = 10
+HIDDEN_MOL_VAE = 100
 
 class Decoder(nn.Module):
     def __init__(self, input_size=200, hidden_n=200, output_feature_size=12, max_seq_length=15):
         super(Decoder, self).__init__()
         self.max_seq_length = max_seq_length
+        if USE_MOLECULE_VAE_PARAMS:
+            hidden_n = HIDDEN_MOL_VAE
+            input_size = HIDDEN_MOL_VAE
         self.hidden_n = hidden_n
         self.output_feature_size = output_feature_size
         self.batch_norm = nn.BatchNorm1d(input_size)
         self.fc_input = nn.Linear(input_size, hidden_n)
+        if USE_MOLECULE_VAE_PARAMS:
+            self.batch_norm = nn.BatchNorm1d(LATENT_REP_SIZE)
+            self.fc_input = nn.Linear(LATENT_REP_SIZE, hidden_n)
         # we specify each layer manually, so that we can do teacher forcing on the last layer.
         # we also use no drop-out in this version.
         self.gru_1 = nn.GRU(input_size=input_size, hidden_size=hidden_n, batch_first=True).to(device)
@@ -60,12 +69,17 @@ class Encoder(nn.Module):
         self.bn_2 = nn.BatchNorm1d(12)
         self.conv_3 = nn.Conv1d(in_channels=12, out_channels=12, kernel_size=k3, groups=12)
         self.bn_3 = nn.BatchNorm1d(12)
-
+        latent_rep_size = hidden_n
+        if USE_MOLECULE_VAE_PARAMS:
+            latent_rep_size = LATENT_REP_SIZE
+            hidden_n = HIDDEN_MOL_VAE
         # todo: harded coded because I can LOL
         self.fc_0 = nn.Linear(12 * 9, hidden_n)
-        self.fc_mu = nn.Linear(hidden_n, hidden_n)
+        
+        self.fc_mu = nn.Linear(hidden_n, latent_rep_size)
+        
         if GrammarVariationalAutoEncoder.VAE_MODE:
-            self.fc_var = nn.Linear(hidden_n, hidden_n)
+            self.fc_var = nn.Linear(hidden_n, latent_rep_size)
 
     def forward(self, x):
         batch_size = x.size()[0]

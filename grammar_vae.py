@@ -7,6 +7,9 @@ from model import GrammarVariationalAutoEncoder, VAELoss, VISUALIZE_DASHBOARD
 import os
 from visdom_helper.visdom_helper import Dashboard
 from visdom_helper.visdom_helper import Dashboard
+import sys
+sys.path.append('../grammarVAE_fork')
+import equation_vae
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -84,7 +87,20 @@ class Session():
         print('====> Test set loss: {:.20f}'.format(test_loss))
 
 
-EPOCHS = 20
+    def test_tangible(self):
+        eq = ['sin(x*2)',
+            'exp(x)+x',
+            'x/3',
+            '3*exp(2/x)']
+        grammar_weights = "../save_model/grammar_ae_model.pt"
+        print(grammar_weights)
+        grammar_model = equation_vae.EquationGrammarModel(grammar_weights, latent_rep_size=25)
+        z, _none = grammar_model.encode(eq)
+        for i, s in enumerate(grammar_model.decode(z)):
+            print(eq[i]+" --> "+s)
+
+
+EPOCHS = 50
 BATCH_SIZE = 200
 import h5py
 
@@ -112,4 +128,5 @@ sess = Session(vae, lr=2e-3)
 for epoch in range(1, EPOCHS + 1):
     losses += sess.train(train_loader, epoch)
     print('epoch {} complete'.format(epoch))
-    sess.test(test_loader)
+    # sess.test(test_loader)
+    sess.test_tangible()
