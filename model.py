@@ -9,9 +9,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 # {'hidden': 100, 'dense': 100, 'conv1': 2, 'conv2': 3, 'conv3': 4}
 USE_MOLECULE_VAE_PARAMS = True
-LATENT_REP_SIZE = 10
+LATENT_REP_SIZE = 25
 HIDDEN_MOL_VAE = 100
-
+MAX_SEQ_LENGTH =  15
 class Decoder(nn.Module):
     def __init__(self, input_size=200, hidden_n=200, output_feature_size=12, max_seq_length=15):
         super(Decoder, self).__init__()
@@ -110,7 +110,12 @@ class VAELoss(nn.Module):
         """gives the batch normalized Variational Error."""
 
         batch_size = x.size()[0]
+        COEFF = 1
+
         BCE = self.bce_loss(recon_x, x)
+        if USE_MOLECULE_VAE_PARAMS:
+            BCE = BCE*MAX_SEQ_LENGTH
+
         KLD = 0
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014

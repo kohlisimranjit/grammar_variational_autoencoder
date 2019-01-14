@@ -3,7 +3,7 @@ import torch.utils.data
 import torch.optim as optim
 from torch.autograd import Variable
 import pdb
-from model import GrammarVariationalAutoEncoder, VAELoss, VISUALIZE_DASHBOARD
+from model import GrammarVariationalAutoEncoder, VAELoss, VISUALIZE_DASHBOARD, LATENT_REP_SIZE
 import os
 from visdom_helper.visdom_helper import Dashboard
 from visdom_helper.visdom_helper import Dashboard
@@ -95,6 +95,7 @@ class Session():
         grammar_weights = "../save_model/grammar_ae_model.pt"
         print(grammar_weights)
         grammar_model = equation_vae.EquationGrammarModel(grammar_weights, latent_rep_size=25)
+        # grammar_model = equation_vae.EquationGrammarModel(grammar_weights, latent_rep_size=LATENT_REP_SIZE)
         z, _none = grammar_model.encode(eq)
         for i, s in enumerate(grammar_model.decode(z)):
             print(eq[i]+" --> "+s)
